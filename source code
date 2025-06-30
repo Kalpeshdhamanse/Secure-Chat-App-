@@ -1,0 +1,119 @@
+ import os
+import zipfile
+
+# Define directory structure and files
+project_dir = "/mnt/data/secure-chat-app"
+os.makedirs(project_dir + "/keys", exist_ok=True)
+
+# File content definitions
+files = {
+    "generate_keys.py": """
+from Crypto.PublicKey import RSA
+import os
+
+def generate_keys(name):
+    key = RSA.generate(2048)
+    private_key = key.export_key()
+    public_key = key.publickey().export_key()
+
+    os.makedirs("keys", exist_ok=True)
+
+    with open(f"keys/{name}_private.pem", "wb") as prv_file:
+        prv_file.write(private_key)
+    with open(f"keys/{name}_public.pem", "wb") as pub_file:
+        pub_file.write(public_key)
+
+generate_keys("server")
+generate_keys("client")
+""",
+    "encryption_utils.py": """
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import base64
+
+def load_key(path):
+    with open(path, "rb") as file:
+        return RSA.import_key(file.read())
+
+def encrypt_msg(message, public_key):
+    cipher = PKCS1_OAEP.new(public_key)
+    return base64.b64encode(cipher.encrypt(message.encode()))
+
+def decrypt_msg(encrypted_msg, private_key):
+    cipher = PKCS1_OAEP.new(private_key)
+    return cipher.decrypt(base64.b64decode(encrypted_msg)).decode()
+""",
+    "server.py": """
+import socket
+from encryption_utils import *
+
+server_private = load_key("keys/server_private.pem")
+client_public = load_key("keys/client_public.pem")
+
+server = socket.socket()
+server.bind(('localhost', 9999))
+server.listen(1)
+print("🔐 Server waiting for connection...")
+
+conn, addr = server.accept()
+print("🟢 Connected to:", addr)
+
+while True:
+    encrypted_data = conn.recv(2048)
+    if not encrypted_data:
+        break
+    message = decrypt_msg(encrypted_data, server_private)
+    print("Client:", message)
+
+    reply = input("You: ")
+    if reply.lower() == 'exit':
+        break
+    encrypted_reply = encrypt_msg(reply, client_public)
+    conn.send(encrypted_reply)
+
+conn.close()
+""",
+    "client.py": """
+import socket
+from encryption_utils import *
+
+client_private = load_key("keys/client_private.pem")
+server_public = load_key("keys/server_public.pem")
+
+client = socket.socket()
+client.connect(('localhost', 9999))
+print("🔐 Connected to Server")
+
+while True:
+    message = input("You: ")
+    if message.lower() == 'exit':
+        break
+    encrypted_msg = encrypt_msg(message, server_public)
+    client.send(encrypted_msg)
+
+    encrypted_reply = client.recv(2048)
+    print("Server:", decrypt_msg(encrypted_reply, client_private))
+
+client.close()
+""",
+    "README.md": """
+# 🔐 Secure Chat App (End-to-End Encrypted)
+
+## 📌 Project Title
+Secure Encrypted Chat Application using Python (Socket + RSA + CLI)
+
+## 📌 Short Description
+A command-line-based secure messaging tool developed in Python using socket programming and RSA public-key encryption. It enables two-way communication between a client and server with end-to-end encryption.
+
+## 🚀 Features
+- RSA encryption for secure message transfer
+- Real-time two-way chat (Client ↔ Server)
+- CLI-based
+- Uses public/private key encryption for message confidentiality
+
+## ▶️ How to Run
+
+### Step 1: Create & Activate Virtual Environment
+```bash
+python3 -m venv securechat-venv
+source securechat-venv/bin/activate
