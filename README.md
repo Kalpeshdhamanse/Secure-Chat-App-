@@ -73,3 +73,7 @@ Step 6: Start Client (Terminal 2)
 ```
 python client.py
 ```
+
+
+
+✅ Built by **Kalpesh Dhamanse** —  [GitHub](https://github.com/Kalpeshdhamanse/Secure-Chat-App-.git)
